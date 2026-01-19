@@ -1,0 +1,49 @@
+<Project>
+  <PropertyGroup>
+    <!-- Enable all .NET analyzers -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+
+    <!-- Enforce code style in build -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Treat warnings as errors in CI -->
+    <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
+
+    <!-- Nullable reference types -->
+    <Nullable>enable</Nullable>
+
+    <!-- Implicit usings -->
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Generate documentation (required for IDE0005 unused usings check on build) -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Latest language features -->
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Roslyn analyzers for additional code quality rules -->
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.182">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Suppress specific warnings that are too noisy or not applicable -->
+    <!-- CS1591: Missing XML comment - not needed for CLI tool -->
+    <!-- MA0004: Use ConfigureAwait(false) - not needed in app code -->
+    <!-- MA0006: Use string.Equals - valid but noisy -->
+    <!-- MA0011: Use IFormatProvider - valid but noisy for internal strings -->
+    <!-- MA0015: Use ArgumentException with parameter name - would add noise -->
+    <!-- MA0016: Prefer collection abstraction - impacts API design -->
+    <!-- MA0025: Implement the functionality - test mock class -->
+    <!-- MA0039: Certificate validation - needed for dev with self-signed certs -->
+    <!-- MA0048: File name must match type name - conflicts with Program.cs -->
+    <!-- MA0051: Method too long - valid but not blocking -->
+    <NoWarn>$(NoWarn);CS1591;MA0004;MA0006;MA0011;MA0015;MA0016;MA0025;MA0039;MA0048;MA0051</NoWarn>
+  </PropertyGroup>
+</Project>

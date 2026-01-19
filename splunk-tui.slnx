@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SplunkTui/SplunkTui.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SplunkTui.Tests/SplunkTui.Tests.csproj" />
+    <Project Path="tests/SplunkTui.IntegrationTests/SplunkTui.IntegrationTests.csproj" />
+  </Folder>
+</Solution>
