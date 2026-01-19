@@ -190,10 +190,11 @@ public static class TuiCommand
         state.Events.Clear();
         state.SelectedIndex = 0;
 
+        string? sid = null;
         try
         {
             // Create search job with last 24 hours
-            var sid = await client.CreateSearchJobAsync(state.Query, "-24h", "now", ct);
+            sid = await client.CreateSearchJobAsync(state.Query, "-24h", "now", ct);
             state.Status = $"Job created: {sid}. Waiting for results...";
 
             // Wait for job to complete
@@ -220,9 +221,6 @@ public static class TuiCommand
 
             state.Events.AddRange(events);
             state.Status = $"Found {job.ResultCount:N0} events. Showing first {events.Length}.";
-
-            // Cleanup job
-            await client.DeleteJobAsync(sid, ct);
         }
         catch (OperationCanceledException)
         {
@@ -235,6 +233,19 @@ public static class TuiCommand
         finally
         {
             state.IsSearching = false;
+
+            // Always cleanup the job if it was created
+            if (!string.IsNullOrEmpty(sid))
+            {
+                try
+                {
+                    await client.DeleteJobAsync(sid, CancellationToken.None);
+                }
+                catch
+                {
+                    // Swallow cleanup exceptions to not mask original error
+                }
+            }
         }
     }
 

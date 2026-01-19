@@ -146,7 +146,7 @@ public static class ExportCommand
         try
         {
             // Validate options
-            ValidateOptions(days, from, to, batchSize);
+            ValidateOptions(days, from, to, max, batchSize);
 
             // Load config and resolve values
             var configService = new ConfigService();
@@ -239,7 +239,7 @@ public static class ExportCommand
         }
     }
 
-    private static void ValidateOptions(int? days, string? from, string? to, int batchSize)
+    private static void ValidateOptions(int? days, string? from, string? to, int max, int batchSize)
     {
         // Check for conflicting time options
         if (days.HasValue && (from != null || to != null))
@@ -250,6 +250,11 @@ public static class ExportCommand
         if (days.HasValue && days.Value < 1)
         {
             throw new ArgumentException("--days must be at least 1.");
+        }
+
+        if (max < 0)
+        {
+            throw new ArgumentException("--max must be 0 or greater.");
         }
 
         if (batchSize < 1)
@@ -277,13 +282,13 @@ public static class ExportCommand
             var earliest = from ?? "-1d";
             var latest = to ?? "now";
 
-            // If it looks like a date, format it for Splunk
-            if (DateTime.TryParse(earliest, out var fromDate))
+            // If it looks like a date, format it for Splunk (use invariant culture for consistent parsing)
+            if (DateTime.TryParse(earliest, CultureInfo.InvariantCulture, DateTimeStyles.None, out var fromDate))
             {
                 earliest = fromDate.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
             }
 
-            if (DateTime.TryParse(latest, out var toDate))
+            if (DateTime.TryParse(latest, CultureInfo.InvariantCulture, DateTimeStyles.None, out var toDate))
             {
                 latest = toDate.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
             }

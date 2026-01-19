@@ -50,7 +50,7 @@ public sealed class SplunkClient : ISplunkClient
             ["output_mode"] = "json"
         });
 
-        var response = await _httpClient.PostAsync("services/search/jobs", content, ct);
+        using var response = await _httpClient.PostAsync("services/search/jobs", content, ct);
         await EnsureSuccessAsync(response, "create search job", ct);
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -68,7 +68,7 @@ public sealed class SplunkClient : ISplunkClient
 
     public async Task<SearchJob> GetJobStatusAsync(string sid, CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"services/search/jobs/{sid}?output_mode=json", ct);
+        using var response = await _httpClient.GetAsync($"services/search/jobs/{sid}?output_mode=json", ct);
         await EnsureSuccessAsync(response, "get job status", ct);
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -115,7 +115,7 @@ public sealed class SplunkClient : ISplunkClient
             url += $"&f={string.Join("&f=", fields.Select(Uri.EscapeDataString))}";
         }
 
-        var response = await _httpClient.GetAsync(url, ct);
+        using var response = await _httpClient.GetAsync(url, ct);
         await EnsureSuccessAsync(response, "get results", ct);
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -124,7 +124,7 @@ public sealed class SplunkClient : ISplunkClient
 
     public async Task DeleteJobAsync(string sid, CancellationToken ct = default)
     {
-        var response = await _httpClient.DeleteAsync($"services/search/jobs/{sid}", ct);
+        using var response = await _httpClient.DeleteAsync($"services/search/jobs/{sid}", ct);
         // Don't throw on delete failure - it's cleanup
         if (!response.IsSuccessStatusCode)
         {

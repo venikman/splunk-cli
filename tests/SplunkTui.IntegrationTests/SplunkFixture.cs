@@ -46,7 +46,7 @@ public sealed class SplunkFixture : IAsyncLifetime
         {
             try
             {
-                var response = await _adminClient!.GetAsync("services/server/health/splunkd/details");
+                using var response = await _adminClient!.GetAsync("services/server/health/splunkd/details");
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -71,7 +71,7 @@ public sealed class SplunkFixture : IAsyncLifetime
             ["audience"] = $"integration-test-{Guid.NewGuid():N}"
         });
 
-        var response = await _adminClient!.PostAsync(
+        using var response = await _adminClient!.PostAsync(
             "services/authorization/tokens?output_mode=json",
             content);
 
@@ -116,9 +116,10 @@ public sealed class SplunkFixture : IAsyncLifetime
                 $$$"""{"time": {{{timestamp}}}, "host": "{{{host}}}", "sourcetype": "app:logs", "index": "main", "event": {"level": "{{{level}}}", "message": "Test event {{{i}}}", "request_id": "{{{requestId}}}"}}""");
         }
 
-        var response = await hecClient.PostAsync(
+        using var content = new StringContent(events.ToString(), Encoding.UTF8, "application/json");
+        using var response = await hecClient.PostAsync(
             $"{SplunkHecUrl}/services/collector/event",
-            new StringContent(events.ToString(), Encoding.UTF8, "application/json"));
+            content);
 
         response.EnsureSuccessStatusCode();
     }
