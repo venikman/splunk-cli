@@ -123,7 +123,12 @@ public static class ConfigCommand
 
         if (asJson)
         {
-            var json = JsonSerializer.Serialize(config, s_displayOptions);
+            // Mask token in JSON output to prevent accidental exposure
+            var maskedConfig = config with
+            {
+                Connection = config.Connection with { Token = MaskToken(config.Connection.Token) }
+            };
+            var json = JsonSerializer.Serialize(maskedConfig, s_displayOptions);
             Console.WriteLine(json);
         }
         else
@@ -164,68 +169,76 @@ public static class ConfigCommand
         return string.Concat(token.AsSpan(0, 4), "****", token.AsSpan(token.Length - 4));
     }
 
+    private static readonly string[] s_validFormats = ["csv", "json", "jsonl"];
+
     private static async Task<int> ExecuteSetAsync(string key, string value, string? configPath, CancellationToken ct)
     {
         var configService = new ConfigService();
         var config = await configService.LoadConfigAsync(configPath, ct);
 
-        var updated = ApplyConfigUpdate(config, key, value);
-        if (updated == null)
+        var (updated, error) = ApplyConfigUpdate(config, key, value);
+        if (error != null)
         {
-            Console.Error.WriteLine($"Unknown config key: {key}");
-            Console.Error.WriteLine();
-            Console.Error.WriteLine("Valid keys:");
-            Console.Error.WriteLine("  connection.url      - Splunk server URL");
-            Console.Error.WriteLine("  connection.token    - Auth token");
-            Console.Error.WriteLine("  connection.insecure - Skip SSL verification (true/false)");
-            Console.Error.WriteLine("  defaults.timeRange  - Default time range (e.g., -1d, -24h)");
-            Console.Error.WriteLine("  defaults.maxResults - Default max results");
-            Console.Error.WriteLine("  defaults.batchSize  - Default batch size");
-            Console.Error.WriteLine("  defaults.format     - Default output format (csv/json/jsonl)");
+            Console.Error.WriteLine(error);
+            if (error.StartsWith("Unknown config key", StringComparison.Ordinal))
+            {
+                Console.Error.WriteLine();
+                Console.Error.WriteLine("Valid keys:");
+                Console.Error.WriteLine("  connection.url      - Splunk server URL");
+                Console.Error.WriteLine("  connection.token    - Auth token");
+                Console.Error.WriteLine("  connection.insecure - Skip SSL verification (true/false)");
+                Console.Error.WriteLine("  defaults.timeRange  - Default time range (e.g., -1d, -24h)");
+                Console.Error.WriteLine("  defaults.maxResults - Default max results (integer)");
+                Console.Error.WriteLine("  defaults.batchSize  - Default batch size (integer)");
+                Console.Error.WriteLine("  defaults.format     - Default output format (csv/json/jsonl)");
+            }
             return 1;
         }
 
-        await configService.SaveConfigAsync(updated, configPath, ct);
+        await configService.SaveConfigAsync(updated!, configPath, ct);
         Console.WriteLine($"Set {key} = {(key.Contains("token", StringComparison.OrdinalIgnoreCase) ? "****" : value)}");
         return 0;
     }
 
-    private static AppConfig? ApplyConfigUpdate(AppConfig config, string key, string value)
+    private static (AppConfig? Config, string? Error) ApplyConfigUpdate(AppConfig config, string key, string value)
     {
         return key.ToLowerInvariant() switch
         {
-            "connection.url" => config with
+            "connection.url" => (config with
             {
                 Connection = config.Connection with { Url = value }
-            },
-            "connection.token" => config with
+            }, null),
+            "connection.token" => (config with
             {
                 Connection = config.Connection with { Token = value }
-            },
-            "connection.insecure" => config with
-            {
-                Connection = config.Connection with
-                {
-                    Insecure = value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
-                               string.Equals(value, "1", StringComparison.Ordinal)
-                }
-            },
-            "defaults.timerange" => config with
+            }, null),
+            "connection.insecure" => ParseBooleanStrict(value) is { } boolVal
+                ? (config with { Connection = config.Connection with { Insecure = boolVal } }, null)
+                : (null, $"Invalid value for connection.insecure: '{value}'. Must be 'true' or 'false'."),
+            "defaults.timerange" => (config with
             {
                 Defaults = config.Defaults with { TimeRange = value }
-            },
-            "defaults.maxresults" => int.TryParse(value, out var max)
-                ? config with { Defaults = config.Defaults with { MaxResults = max } }
-                : null,
-            "defaults.batchsize" => int.TryParse(value, out var batch)
-                ? config with { Defaults = config.Defaults with { BatchSize = batch } }
-                : null,
-            "defaults.format" => config with
-            {
-                Defaults = config.Defaults with { Format = value }
-            },
-            _ => null
+            }, null),
+            "defaults.maxresults" => int.TryParse(value, out var max) && max > 0
+                ? (config with { Defaults = config.Defaults with { MaxResults = max } }, null)
+                : (null, $"Invalid value for defaults.maxResults: '{value}'. Must be a positive integer."),
+            "defaults.batchsize" => int.TryParse(value, out var batch) && batch > 0
+                ? (config with { Defaults = config.Defaults with { BatchSize = batch } }, null)
+                : (null, $"Invalid value for defaults.batchSize: '{value}'. Must be a positive integer."),
+            "defaults.format" => s_validFormats.Contains(value, StringComparer.OrdinalIgnoreCase)
+                ? (config with { Defaults = config.Defaults with { Format = value.ToLowerInvariant() } }, null)
+                : (null, $"Invalid value for defaults.format: '{value}'. Must be one of: csv, json, jsonl."),
+            _ => (null, $"Unknown config key: {key}")
         };
+    }
+
+    private static bool? ParseBooleanStrict(string value)
+    {
+        if (value.Equals("true", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (value.Equals("false", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return null;
     }
 
     private static async Task<int> ExecuteInitAsync(string? configPath, bool force, CancellationToken ct)

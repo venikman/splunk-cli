@@ -1,6 +1,5 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using System.Text.Json;
 using Hex1b;
 using Hex1b.Widgets;
 using SplunkTui.Models;
@@ -10,11 +9,6 @@ namespace SplunkTui.Commands;
 
 public static class TuiCommand
 {
-    private static readonly JsonSerializerOptions s_exportJsonOptions = new()
-    {
-        WriteIndented = true
-    };
-
     public static Command Create()
     {
         var command = new Command("tui", "Interactive TUI for exploring Splunk data");
@@ -187,7 +181,7 @@ public static class TuiCommand
 
     private static string GetKeyboardHints(TuiState state) => state.Mode switch
     {
-        TuiMode.EventDetail => "Esc: Back | ↑↓: Scroll",
+        TuiMode.EventDetail => "Enter: Back | ↑↓: Scroll",
         _ => "Ctrl+C: Quit | Enter: Search/Detail | ↑↓: Navigate"
     };
 
@@ -233,7 +227,7 @@ public static class TuiCommand
         // Build field list with header showing navigation hint
         var lines = new List<string>
         {
-            "Press Esc or Backspace to return to results",
+            "Press Enter to return to results",
             new('─', 50)
         };
 
@@ -296,19 +290,23 @@ public static class TuiCommand
             state.Events.AddRange(events);
             state.Status = $"Found {job.ResultCount:N0} events. Showing first {events.Length}. Press Enter on an event for details.";
 
-            // Save query to history (fire and forget, don't block UI)
+            // Update local history state immediately (on main thread for thread safety)
+            state.History.Remove(state.Query);
+            state.History.Insert(0, state.Query);
+            if (state.History.Count > 50)
+                state.History.RemoveAt(state.History.Count - 1);
+
+            // Persist to config file in background (fire and forget, don't block UI)
             if (state.ConfigService != null)
             {
+                var queryToSave = state.Query; // Capture for closure
+                var configServiceRef = state.ConfigService;
+                var configPathRef = state.ConfigPath;
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await state.ConfigService.AddHistoryAsync(state.Query, state.ConfigPath, 50, CancellationToken.None);
-                        // Update local history state
-                        state.History.Remove(state.Query);
-                        state.History.Insert(0, state.Query);
-                        if (state.History.Count > 50)
-                            state.History.RemoveAt(state.History.Count - 1);
+                        await configServiceRef.AddHistoryAsync(queryToSave, configPathRef, 50, CancellationToken.None);
                     }
                     catch
                     {

@@ -20,6 +20,9 @@ public sealed class ConfigService : IConfigService
     private const string EnvToken = "SPLUNK_TOKEN";
     private const string EnvInsecure = "SPLUNK_INSECURE";
 
+    // Lock for thread-safe config file writes (prevents race conditions)
+    private static readonly SemaphoreSlim s_writeLock = new(1, 1);
+
     public string DefaultConfigPath => s_defaultConfigPath;
 
     public async Task<AppConfig> LoadConfigAsync(string? configPath = null, CancellationToken ct = default)
@@ -45,8 +48,23 @@ public sealed class ConfigService : IConfigService
     {
         var path = configPath ?? s_defaultConfigPath;
 
-        await using var stream = File.Create(path);
-        await JsonSerializer.SerializeAsync(stream, config, s_jsonOptions, ct);
+        // Ensure parent directory exists
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await s_writeLock.WaitAsync(ct);
+        try
+        {
+            await using var stream = File.Create(path);
+            await JsonSerializer.SerializeAsync(stream, config, s_jsonOptions, ct);
+        }
+        finally
+        {
+            s_writeLock.Release();
+        }
     }
 
     public async Task AddHistoryAsync(string query, string? configPath = null, int maxEntries = 50, CancellationToken ct = default)
@@ -54,31 +72,53 @@ public sealed class ConfigService : IConfigService
         if (string.IsNullOrWhiteSpace(query))
             return;
 
-        var config = await LoadConfigAsync(configPath, ct);
+        var path = configPath ?? s_defaultConfigPath;
 
-        // Remove duplicates and add to front
-        var history = config.History
-            .Where(h => !string.Equals(h, query, StringComparison.Ordinal))
-            .Prepend(query)
-            .Take(maxEntries)
-            .ToList();
+        // Lock the entire read-modify-write cycle to prevent race conditions
+        await s_writeLock.WaitAsync(ct);
+        try
+        {
+            var config = await LoadConfigInternalAsync(path, ct);
 
-        var updated = config with { History = history };
-        await SaveConfigAsync(updated, configPath, ct);
+            // Remove duplicates and add to front
+            var history = config.History
+                .Where(h => !string.Equals(h, query, StringComparison.Ordinal))
+                .Prepend(query)
+                .Take(maxEntries)
+                .ToList();
+
+            var updated = config with { History = history };
+            await SaveConfigInternalAsync(updated, path, ct);
+        }
+        finally
+        {
+            s_writeLock.Release();
+        }
     }
 
     public async Task SaveSearchAsync(SavedSearch search, string? configPath = null, CancellationToken ct = default)
     {
-        var config = await LoadConfigAsync(configPath, ct);
+        var path = configPath ?? s_defaultConfigPath;
 
-        // Replace existing search with same name or add new
-        var searches = config.SavedSearches
-            .Where(s => !string.Equals(s.Name, search.Name, StringComparison.OrdinalIgnoreCase))
-            .Append(search)
-            .ToList();
+        // Lock the entire read-modify-write cycle to prevent race conditions
+        await s_writeLock.WaitAsync(ct);
+        try
+        {
+            var config = await LoadConfigInternalAsync(path, ct);
 
-        var updated = config with { SavedSearches = searches };
-        await SaveConfigAsync(updated, configPath, ct);
+            // Replace existing search with same name or add new
+            var searches = config.SavedSearches
+                .Where(s => !string.Equals(s.Name, search.Name, StringComparison.OrdinalIgnoreCase))
+                .Append(search)
+                .ToList();
+
+            var updated = config with { SavedSearches = searches };
+            await SaveConfigInternalAsync(updated, path, ct);
+        }
+        finally
+        {
+            s_writeLock.Release();
+        }
     }
 
     public string? ResolveUrl(string? cliUrl, AppConfig config)
@@ -135,5 +175,36 @@ string.Equals(envInsecure, "1", StringComparison.Ordinal);
 
         // Remove trailing slash to avoid double slashes in requests
         return url.TrimEnd('/');
+    }
+
+    // Internal methods without locking (for use within already-locked contexts)
+    private static async Task<AppConfig> LoadConfigInternalAsync(string path, CancellationToken ct)
+    {
+        if (!File.Exists(path))
+            return AppConfig.Empty;
+
+        try
+        {
+            await using var stream = File.OpenRead(path);
+            var config = await JsonSerializer.DeserializeAsync<AppConfig>(stream, s_jsonOptions, ct);
+            return config ?? AppConfig.Empty;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"Invalid config file at {path}: {ex.Message}", ex);
+        }
+    }
+
+    private static async Task SaveConfigInternalAsync(AppConfig config, string path, CancellationToken ct)
+    {
+        // Ensure parent directory exists
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await using var stream = File.Create(path);
+        await JsonSerializer.SerializeAsync(stream, config, s_jsonOptions, ct);
     }
 }
