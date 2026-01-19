@@ -20,8 +20,8 @@ public sealed class ConfigService : IConfigService
     private const string EnvToken = "SPLUNK_TOKEN";
     private const string EnvInsecure = "SPLUNK_INSECURE";
 
-    // Lock for thread-safe config file writes (prevents race conditions)
-    private static readonly SemaphoreSlim s_writeLock = new(1, 1);
+    // Lock for thread-safe config file access (prevents reading partial writes)
+    private static readonly SemaphoreSlim s_configLock = new(1, 1);
 
     public string DefaultConfigPath => s_defaultConfigPath;
 
@@ -32,8 +32,13 @@ public sealed class ConfigService : IConfigService
         if (!File.Exists(path))
             return AppConfig.Empty;
 
+        await s_configLock.WaitAsync(ct);
         try
         {
+            // Re-check existence after acquiring lock
+            if (!File.Exists(path))
+                return AppConfig.Empty;
+
             await using var stream = File.OpenRead(path);
             var config = await JsonSerializer.DeserializeAsync<AppConfig>(stream, s_jsonOptions, ct);
             return config ?? AppConfig.Empty;
@@ -41,6 +46,10 @@ public sealed class ConfigService : IConfigService
         catch (JsonException ex)
         {
             throw new InvalidOperationException($"Invalid config file at {path}: {ex.Message}", ex);
+        }
+        finally
+        {
+            s_configLock.Release();
         }
     }
 
@@ -55,7 +64,7 @@ public sealed class ConfigService : IConfigService
             Directory.CreateDirectory(directory);
         }
 
-        await s_writeLock.WaitAsync(ct);
+        await s_configLock.WaitAsync(ct);
         try
         {
             await using var stream = File.Create(path);
@@ -63,7 +72,7 @@ public sealed class ConfigService : IConfigService
         }
         finally
         {
-            s_writeLock.Release();
+            s_configLock.Release();
         }
     }
 
@@ -75,7 +84,7 @@ public sealed class ConfigService : IConfigService
         var path = configPath ?? s_defaultConfigPath;
 
         // Lock the entire read-modify-write cycle to prevent race conditions
-        await s_writeLock.WaitAsync(ct);
+        await s_configLock.WaitAsync(ct);
         try
         {
             var config = await LoadConfigInternalAsync(path, ct);
@@ -92,7 +101,7 @@ public sealed class ConfigService : IConfigService
         }
         finally
         {
-            s_writeLock.Release();
+            s_configLock.Release();
         }
     }
 
@@ -101,7 +110,7 @@ public sealed class ConfigService : IConfigService
         var path = configPath ?? s_defaultConfigPath;
 
         // Lock the entire read-modify-write cycle to prevent race conditions
-        await s_writeLock.WaitAsync(ct);
+        await s_configLock.WaitAsync(ct);
         try
         {
             var config = await LoadConfigInternalAsync(path, ct);
@@ -117,7 +126,7 @@ public sealed class ConfigService : IConfigService
         }
         finally
         {
-            s_writeLock.Release();
+            s_configLock.Release();
         }
     }
 
