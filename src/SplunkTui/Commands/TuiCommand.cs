@@ -123,6 +123,7 @@ public static class TuiCommand
             ServerUrl = serverUrl,
             Query = config.History.Count > 0 ? config.History[0] : "index=main",
             Status = "Ready. Press Enter to search, Ctrl+C to quit.",
+            TimeRange = config.Defaults.TimeRange,
             ConfigService = configService,
             ConfigPath = configPath
         };
@@ -175,7 +176,7 @@ public static class TuiCommand
 
     private static string GetMainPanelTitle(TuiState state) => state.Mode switch
     {
-        TuiMode.EventDetail => "Event Detail (Esc to go back)",
+        TuiMode.EventDetail => "Event Detail (Enter to go back)",
         _ => "Results"
     };
 
@@ -261,8 +262,8 @@ public static class TuiCommand
         string? sid = null;
         try
         {
-            // Create search job with last 24 hours
-            sid = await client.CreateSearchJobAsync(state.Query, "-24h", "now", ct);
+            // Create search job with configured time range
+            sid = await client.CreateSearchJobAsync(state.Query, state.TimeRange, "now", ct);
             state.Status = $"Job created: {sid}. Waiting for results...";
 
             // Wait for job to complete
@@ -367,6 +368,9 @@ public static class TuiCommand
         public double SearchProgress { get; set; }
         public int SelectedIndex { get; set; }
         public List<SplunkEvent> Events { get; } = [];
+
+        // Config defaults
+        public string TimeRange { get; set; } = "-24h";
 
         // History and saved searches (persisted but not displayed in separate UI modes)
         public List<string> History { get; } = [];
