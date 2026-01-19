@@ -1,15 +1,8 @@
 using System.CommandLine;
 using SplunkTui.Commands;
 
-// Set up Ctrl+C handling
-using var cts = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) =>
-{
-    e.Cancel = true;
-    cts.Cancel();
-};
-
 // Build CLI
+// Note: System.CommandLine handles Ctrl+C internally via ctx.GetCancellationToken()
 var rootCommand = new RootCommand("Splunk TUI CLI - Export and explore Splunk data")
 {
     Name = "splunk-tui"

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using SplunkTui.Formatters;
 using SplunkTui.Models;
 
@@ -148,8 +149,8 @@ public sealed class ExportService : IExportService
     {
         if (string.IsNullOrEmpty(outputPath))
         {
-            // Write to stdout
-            return Console.Out;
+            // Wrap Console.Out so disposal doesn't close it
+            return new NonDisposingTextWriter(Console.Out);
         }
 
         // Ensure directory exists
@@ -161,6 +162,30 @@ public sealed class ExportService : IExportService
 
         // Open file (overwrites silently per design decision)
         return new StreamWriter(outputPath, append: false, encoding: System.Text.Encoding.UTF8);
+    }
+
+    /// <summary>
+    /// Wrapper that forwards all writes but ignores disposal.
+    /// Used to prevent closing Console.Out when the caller disposes.
+    /// </summary>
+    private sealed class NonDisposingTextWriter : TextWriter
+    {
+        private readonly TextWriter _inner;
+
+        public NonDisposingTextWriter(TextWriter inner) => _inner = inner;
+
+        public override Encoding Encoding => _inner.Encoding;
+
+        public override void Write(char value) => _inner.Write(value);
+        public override void Write(string? value) => _inner.Write(value);
+        public override void WriteLine(string? value) => _inner.WriteLine(value);
+        public override Task WriteAsync(char value) => _inner.WriteAsync(value);
+        public override Task WriteAsync(string? value) => _inner.WriteAsync(value);
+        public override Task WriteLineAsync(string? value) => _inner.WriteLineAsync(value);
+        public override void Flush() => _inner.Flush();
+        public override Task FlushAsync() => _inner.FlushAsync();
+
+        // Intentionally do NOT override Dispose/DisposeAsync - let them be no-ops
     }
 
     private sealed class BatchProgress

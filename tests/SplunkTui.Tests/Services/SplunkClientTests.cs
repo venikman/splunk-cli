@@ -14,7 +14,7 @@ public class SplunkClientTests
         // This is the CRITICAL test - Splunk uses "Splunk" prefix, NOT "Bearer"
         using var client = new HttpClient();
 
-        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "test-token-123", false);
+        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "test-token-123");
 
         client.DefaultRequestHeaders.Authorization.Should().NotBeNull();
         client.DefaultRequestHeaders.Authorization!.Scheme.Should().Be("Splunk");
@@ -26,7 +26,7 @@ public class SplunkClientTests
     {
         using var client = new HttpClient();
 
-        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "my-token", false);
+        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "my-token");
 
         client.DefaultRequestHeaders.Authorization!.Scheme.Should().NotBe("Bearer");
     }
@@ -36,7 +36,7 @@ public class SplunkClientTests
     {
         using var client = new HttpClient();
 
-        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "token", false);
+        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "token");
 
         client.BaseAddress.Should().NotBeNull();
         client.BaseAddress!.Host.Should().Be("splunk.example.com");
@@ -48,7 +48,7 @@ public class SplunkClientTests
     {
         using var client = new HttpClient();
 
-        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089/", "token", false);
+        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089/", "token");
 
         // Should have a trailing slash for proper path resolution
         client.BaseAddress!.AbsoluteUri.Should().EndWith("/");
@@ -59,7 +59,7 @@ public class SplunkClientTests
     {
         using var client = new HttpClient();
 
-        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "token", false);
+        SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "token");
 
         client.DefaultRequestHeaders.Accept.Should().Contain(
             h => h.MediaType == "application/json");

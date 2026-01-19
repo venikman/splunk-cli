@@ -17,8 +17,9 @@ public sealed class SplunkClient : ISplunkClient
 
     /// <summary>
     /// Configures an HttpClient for Splunk API access.
+    /// Note: SSL certificate validation should be configured on the HttpClientHandler before creating the HttpClient.
     /// </summary>
-    public static void ConfigureHttpClient(HttpClient client, string baseUrl, string token, bool insecure)
+    public static void ConfigureHttpClient(HttpClient client, string baseUrl, string token)
     {
         client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
 

@@ -26,16 +26,24 @@ public class ConfigServiceTests
     [Fact]
     public void ResolveUrl_OnlyConfig_UsesConfig()
     {
-        var config = new AppConfig
+        var originalEnv = Environment.GetEnvironmentVariable("SPLUNK_URL");
+        try
         {
-            Connection = new ConnectionConfig { Url = "https://config.example.com:8089" }
-        };
+            Environment.SetEnvironmentVariable("SPLUNK_URL", null);
 
-        var result = _configService.ResolveUrl(null, config);
+            var config = new AppConfig
+            {
+                Connection = new ConnectionConfig { Url = "https://config.example.com:8089" }
+            };
 
-        // If env var is not set, should use config
-        // Note: This test may be affected by actual env vars if set
-        result.Should().NotBeNull();
+            var result = _configService.ResolveUrl(null, config);
+
+            result.Should().Be("https://config.example.com:8089");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SPLUNK_URL", originalEnv);
+        }
     }
 
     [Fact]

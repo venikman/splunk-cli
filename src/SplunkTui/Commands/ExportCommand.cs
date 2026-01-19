@@ -204,7 +204,7 @@ public static class ExportCommand
             }
 
             using var httpClient = new HttpClient(handler);
-            SplunkClient.ConfigureHttpClient(httpClient, url, token, insecure);
+            SplunkClient.ConfigureHttpClient(httpClient, url, token);
 
             var splunkClient = new SplunkClient(httpClient);
             var exportService = new ExportService(splunkClient);

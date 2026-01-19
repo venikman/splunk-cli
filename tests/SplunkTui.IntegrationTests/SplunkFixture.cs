@@ -154,7 +154,7 @@ public sealed class SplunkFixture : IAsyncLifetime
         };
 
         var client = new HttpClient(handler);
-        Services.SplunkClient.ConfigureHttpClient(client, SplunkApiUrl, ApiToken, true);
+        Services.SplunkClient.ConfigureHttpClient(client, SplunkApiUrl, ApiToken);
         return client;
     }
 }
