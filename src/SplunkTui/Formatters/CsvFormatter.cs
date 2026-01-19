@@ -20,7 +20,8 @@ public sealed class CsvFormatter : IEventFormatter
 
         await foreach (var batch in events.WithCancellation(ct))
         {
-            if (batch.Length == 0) continue;
+            if (batch.Length == 0)
+                continue;
 
             // Determine fields from first batch if not specified
             if (isFirstBatch)

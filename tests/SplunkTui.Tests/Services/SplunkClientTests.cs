@@ -250,7 +250,7 @@ public class SplunkClientTests
 
     #endregion
 
-    private class MockHttpMessageHandler : HttpMessageHandler
+    private sealed class MockHttpMessageHandler : HttpMessageHandler
     {
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
         private readonly Func<HttpRequestMessage, Task<HttpResponseMessage>>? _asyncHandler;

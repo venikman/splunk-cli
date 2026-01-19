@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using SplunkTui.Models;
 
 namespace SplunkTui.Services;
@@ -37,12 +36,13 @@ public sealed class SplunkClient : ISplunkClient
         // Splunk expects the search to start with "search " if it's a raw search
         var searchQuery = query.TrimStart();
         if (!searchQuery.StartsWith("search ", StringComparison.OrdinalIgnoreCase) &&
-            !searchQuery.StartsWith("|"))
+            !searchQuery.StartsWith('|'))
         {
             searchQuery = $"search {searchQuery}";
         }
 
         using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+(StringComparer.Ordinal)
         {
             ["search"] = searchQuery,
             ["earliest_time"] = earliestTime,

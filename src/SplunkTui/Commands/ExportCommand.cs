@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Globalization;
 using SplunkTui.Models;
 using SplunkTui.Services;
 
@@ -279,12 +280,12 @@ public static class ExportCommand
             // If it looks like a date, format it for Splunk
             if (DateTime.TryParse(earliest, out var fromDate))
             {
-                earliest = fromDate.ToString("yyyy-MM-ddTHH:mm:ss");
+                earliest = fromDate.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
             }
 
             if (DateTime.TryParse(latest, out var toDate))
             {
-                latest = toDate.ToString("yyyy-MM-ddTHH:mm:ss");
+                latest = toDate.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
             }
 
             return (earliest, latest);

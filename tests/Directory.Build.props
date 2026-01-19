@@ -1,0 +1,13 @@
+<Project>
+  <!-- Import parent Directory.Build.props -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..'))" />
+
+  <PropertyGroup>
+    <!-- Suppress test-specific warnings -->
+    <!-- CA1305: IFormatProvider in test fixtures (not important) -->
+    <!-- CA1707: Underscores in test method names (common convention) -->
+    <!-- CA1711: Types ending in 'Collection' (xUnit fixtures) -->
+    <!-- CA1822: Member can be static (fixture properties) -->
+    <NoWarn>$(NoWarn);CA1305;CA1707;CA1711;CA1822</NoWarn>
+  </PropertyGroup>
+</Project>

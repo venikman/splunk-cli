@@ -7,7 +7,7 @@ namespace SplunkTui.IntegrationTests;
 /// <summary>
 /// Shared fixture for integration tests.
 /// Expects Splunk to be running via docker-compose before tests start.
-/// Run: docker compose up -d && ./scripts/setup-tests.sh
+/// Run: docker compose up -d, then ./scripts/setup-tests.sh
 /// </summary>
 public sealed class SplunkFixture : IAsyncLifetime
 {
@@ -65,6 +65,7 @@ public sealed class SplunkFixture : IAsyncLifetime
     {
         // Splunk token API: "name" is the username, "audience" is a unique identifier
         using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+(StringComparer.Ordinal)
         {
             ["name"] = "admin",
             ["audience"] = $"integration-test-{Guid.NewGuid():N}"

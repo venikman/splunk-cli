@@ -15,10 +15,10 @@ internal static class FormatterUtils
     {
         if (fields == null || fields.Length == 0)
         {
-            return new Dictionary<string, string?>(evt);
+            return new Dictionary<string, string?>(evt, StringComparer.Ordinal);
         }
 
-        var filtered = new Dictionary<string, string?>();
+        var filtered = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (var field in fields.Where(f => evt.ContainsKey(f)))
         {
             filtered[field] = evt[field];

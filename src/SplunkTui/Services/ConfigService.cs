@@ -77,7 +77,7 @@ public sealed class ConfigService : IConfigService
         var envInsecure = Environment.GetEnvironmentVariable(EnvInsecure);
         if (!string.IsNullOrWhiteSpace(envInsecure))
             return envInsecure.Equals("true", StringComparison.OrdinalIgnoreCase) ||
-                   envInsecure == "1";
+string.Equals(envInsecure, "1", StringComparison.Ordinal);
 
         return config.Connection.Insecure;
     }
