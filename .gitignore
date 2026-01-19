@@ -1,0 +1,31 @@
+# Build outputs
+bin/
+obj/
+out/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+.idea/
+
+# NuGet
+*.nupkg
+packages/
+
+# Test results
+TestResults/
+coverage/
+
+# Local config (may contain tokens)
+.splunk-tui.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Output files from testing
+*.csv
+*.jsonl
+events.json
