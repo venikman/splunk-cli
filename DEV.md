@@ -152,8 +152,8 @@ The test fixture automatically:
 Stop containers with `docker compose down`. Data persists in Docker volumes.
 
 ```bash
-# Remove volumes to reset all Splunk data
-docker volume rm splunk-explore_splunk-data splunk-explore_splunk-etc
+# Stop containers and remove volumes to reset all Splunk data
+docker compose down -v
 ```
 
 ---

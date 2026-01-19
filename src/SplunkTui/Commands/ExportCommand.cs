@@ -70,9 +70,12 @@ public static class ExportCommand
             aliases: ["--token"],
             description: "Splunk auth token");
 
-        var insecureOption = new Option<bool>(
+        var insecureOption = new Option<bool?>(
             aliases: ["--insecure"],
-            description: "Skip SSL certificate verification");
+            description: "Skip SSL certificate verification")
+        {
+            Arity = ArgumentArity.ZeroOrOne
+        };
 
         var configOption = new Option<string?>(
             aliases: ["--config"],
@@ -135,7 +138,7 @@ public static class ExportCommand
         bool showProgress,
         string? cliUrl,
         string? cliToken,
-        bool cliInsecure,
+        bool? cliInsecure,
         string? configPath,
         CancellationToken ct)
     {

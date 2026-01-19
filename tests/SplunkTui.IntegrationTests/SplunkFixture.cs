@@ -64,7 +64,7 @@ public sealed class SplunkFixture : IAsyncLifetime
     private async Task<string> CreateApiTokenAsync()
     {
         // Splunk token API: "name" is the username, "audience" is a unique identifier
-        var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["name"] = "admin",
             ["audience"] = $"integration-test-{Guid.NewGuid():N}"
@@ -77,7 +77,7 @@ public sealed class SplunkFixture : IAsyncLifetime
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         var token = doc.RootElement
             .GetProperty("entry")[0]
             .GetProperty("content")

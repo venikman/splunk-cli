@@ -55,15 +55,9 @@ public sealed class CsvFormatter : IEventFormatter
 
         // Sort fields, but put common Splunk fields first
         var commonFields = new[] { "_time", "_raw", "host", "source", "sourcetype", "index" };
-        var orderedFields = new List<string>();
-
-        foreach (var common in commonFields)
-        {
-            if (fieldSet.Remove(common))
-            {
-                orderedFields.Add(common);
-            }
-        }
+        var orderedFields = commonFields
+            .Where(c => fieldSet.Remove(c))
+            .ToList();
 
         // Add remaining fields sorted alphabetically
         orderedFields.AddRange(fieldSet.OrderBy(f => f, StringComparer.OrdinalIgnoreCase));

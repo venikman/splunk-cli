@@ -12,7 +12,7 @@ public class SplunkClientTests
     public void ConfigureHttpClient_SetsAuthHeader_WithSplunkPrefix()
     {
         // This is the CRITICAL test - Splunk uses "Splunk" prefix, NOT "Bearer"
-        var client = new HttpClient();
+        using var client = new HttpClient();
 
         SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "test-token-123", false);
 
@@ -24,7 +24,7 @@ public class SplunkClientTests
     [Fact]
     public void ConfigureHttpClient_AuthHeaderIsNotBearer()
     {
-        var client = new HttpClient();
+        using var client = new HttpClient();
 
         SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "my-token", false);
 
@@ -34,7 +34,7 @@ public class SplunkClientTests
     [Fact]
     public void ConfigureHttpClient_SetsBaseAddress()
     {
-        var client = new HttpClient();
+        using var client = new HttpClient();
 
         SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "token", false);
 
@@ -46,7 +46,7 @@ public class SplunkClientTests
     [Fact]
     public void ConfigureHttpClient_NormalizesTrailingSlash()
     {
-        var client = new HttpClient();
+        using var client = new HttpClient();
 
         SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089/", "token", false);
 
@@ -57,7 +57,7 @@ public class SplunkClientTests
     [Fact]
     public void ConfigureHttpClient_SetsJsonAcceptHeader()
     {
-        var client = new HttpClient();
+        using var client = new HttpClient();
 
         SplunkClient.ConfigureHttpClient(client, "https://splunk.example.com:8089", "token", false);
 
@@ -87,7 +87,7 @@ public class SplunkClientTests
             };
         });
 
-        var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", "test-token");
 
         var splunkClient = new SplunkClient(client);
@@ -109,7 +109,7 @@ public class SplunkClientTests
             };
         });
 
-        var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", "token");
 
         var splunkClient = new SplunkClient(client);
@@ -131,7 +131,7 @@ public class SplunkClientTests
             };
         });
 
-        var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", "token");
 
         var splunkClient = new SplunkClient(client);
@@ -147,7 +147,7 @@ public class SplunkClientTests
         var handler = new MockHttpMessageHandler(_ =>
             new HttpResponseMessage(HttpStatusCode.Unauthorized));
 
-        var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", "bad-token");
 
         var splunkClient = new SplunkClient(client);
@@ -164,7 +164,7 @@ public class SplunkClientTests
         var handler = new MockHttpMessageHandler(_ =>
             new HttpResponseMessage(HttpStatusCode.Forbidden));
 
-        var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", "token");
 
         var splunkClient = new SplunkClient(client);
@@ -195,7 +195,7 @@ public class SplunkClientTests
                     """)
             });
 
-        var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", "token");
 
         var splunkClient = new SplunkClient(client);
@@ -220,7 +220,7 @@ public class SplunkClientTests
             };
         });
 
-        var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", "token");
 
         var splunkClient = new SplunkClient(client);
@@ -239,7 +239,7 @@ public class SplunkClientTests
                 Content = new StringContent("""{ "results": [] }""")
             });
 
-        var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://splunk.example.com:8089/") };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", "token");
 
         var splunkClient = new SplunkClient(client);

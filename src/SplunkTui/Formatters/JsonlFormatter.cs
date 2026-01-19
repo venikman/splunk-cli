@@ -5,6 +5,7 @@ namespace SplunkTui.Formatters;
 
 /// <summary>
 /// Formats events as JSON Lines (one JSON object per line, no wrapper).
+/// This format streams efficiently without buffering all events.
 /// </summary>
 public sealed class JsonlFormatter : IEventFormatter
 {
@@ -27,7 +28,7 @@ public sealed class JsonlFormatter : IEventFormatter
         {
             foreach (var evt in batch)
             {
-                var filtered = FilterFields(evt, fields);
+                var filtered = FormatterUtils.FilterFields(evt, fields);
                 var json = JsonSerializer.Serialize(filtered, Options);
                 await writer.WriteLineAsync(json);
                 count++;
@@ -35,23 +36,5 @@ public sealed class JsonlFormatter : IEventFormatter
         }
 
         return count;
-    }
-
-    private static Dictionary<string, string?> FilterFields(SplunkEvent evt, string[]? fields)
-    {
-        if (fields == null || fields.Length == 0)
-        {
-            return new Dictionary<string, string?>(evt);
-        }
-
-        var filtered = new Dictionary<string, string?>();
-        foreach (var field in fields)
-        {
-            if (evt.TryGetValue(field, out var value))
-            {
-                filtered[field] = value;
-            }
-        }
-        return filtered;
     }
 }

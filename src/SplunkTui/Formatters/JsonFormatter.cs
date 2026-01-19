@@ -5,15 +5,11 @@ namespace SplunkTui.Formatters;
 
 /// <summary>
 /// Formats events as pretty-printed JSON with metadata wrapper.
+/// Note: JSON format with metadata requires knowing the count, so events are collected first.
+/// For large exports, use JSONL format which streams without buffering.
 /// </summary>
 public sealed class JsonFormatter : IEventFormatter
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     public async Task<int> WriteAsync(
         TextWriter writer,
         IAsyncEnumerable<SplunkEvent[]> events,
@@ -21,53 +17,59 @@ public sealed class JsonFormatter : IEventFormatter
         ExportMetadata metadata,
         CancellationToken ct = default)
     {
-        // Collect all events (JSON format requires complete structure)
+        // Collect events (JSON with metadata requires count upfront)
+        // For large exports, users should use JSONL format which streams
         var allEvents = new List<Dictionary<string, string?>>();
 
         await foreach (var batch in events.WithCancellation(ct))
         {
             foreach (var evt in batch)
             {
-                var filtered = FilterFields(evt, fields);
+                var filtered = FormatterUtils.FilterFields(evt, fields);
                 allEvents.Add(filtered);
             }
         }
 
-        // Build the output structure
-        var output = new
+        // Stream write using Utf8JsonWriter for efficiency
+        using var stream = new MemoryStream();
+        await using (var jsonWriter = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
         {
-            meta = new
-            {
-                query = metadata.Query,
-                from = metadata.From,
-                to = metadata.To,
-                count = allEvents.Count,
-                exported_at = metadata.ExportedAt.ToString("O")
-            },
-            results = allEvents
-        };
+            jsonWriter.WriteStartObject();
 
-        var json = JsonSerializer.Serialize(output, Options);
+            // Write metadata
+            jsonWriter.WritePropertyName("meta");
+            jsonWriter.WriteStartObject();
+            jsonWriter.WriteString("query", metadata.Query);
+            jsonWriter.WriteString("from", metadata.From);
+            jsonWriter.WriteString("to", metadata.To);
+            jsonWriter.WriteNumber("count", allEvents.Count);
+            jsonWriter.WriteString("exported_at", metadata.ExportedAt.ToString("O"));
+            jsonWriter.WriteEndObject();
+
+            // Write results array
+            jsonWriter.WritePropertyName("results");
+            jsonWriter.WriteStartArray();
+
+            foreach (var evt in allEvents)
+            {
+                jsonWriter.WriteStartObject();
+                foreach (var kvp in evt)
+                {
+                    jsonWriter.WriteString(kvp.Key, kvp.Value);
+                }
+                jsonWriter.WriteEndObject();
+            }
+
+            jsonWriter.WriteEndArray();
+            jsonWriter.WriteEndObject();
+        }
+
+        // Write to output
+        stream.Position = 0;
+        using var reader = new StreamReader(stream);
+        var json = await reader.ReadToEndAsync(ct);
         await writer.WriteAsync(json);
 
         return allEvents.Count;
-    }
-
-    private static Dictionary<string, string?> FilterFields(SplunkEvent evt, string[]? fields)
-    {
-        if (fields == null || fields.Length == 0)
-        {
-            return new Dictionary<string, string?>(evt);
-        }
-
-        var filtered = new Dictionary<string, string?>();
-        foreach (var field in fields)
-        {
-            if (evt.TryGetValue(field, out var value))
-            {
-                filtered[field] = value;
-            }
-        }
-        return filtered;
     }
 }

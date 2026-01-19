@@ -41,7 +41,7 @@ public sealed class SplunkClient : ISplunkClient
             searchQuery = $"search {searchQuery}";
         }
 
-        var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["search"] = searchQuery,
             ["earliest_time"] = earliestTime,
@@ -53,7 +53,7 @@ public sealed class SplunkClient : ISplunkClient
         await EnsureSuccessAsync(response, "create search job", ct);
 
         var json = await response.Content.ReadAsStringAsync(ct);
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
 
         // Response format: { "sid": "1234567890.123" }
         if (doc.RootElement.TryGetProperty("sid", out var sidElement))
@@ -127,13 +127,14 @@ public sealed class SplunkClient : ISplunkClient
         // Don't throw on delete failure - it's cleanup
         if (!response.IsSuccessStatusCode)
         {
-            // Log warning but don't fail
+            System.Diagnostics.Debug.WriteLine(
+                $"[Warning] Failed to delete Splunk job {sid}. Status: {response.StatusCode}");
         }
     }
 
     private static SearchJob ParseJobStatus(string json, string sid)
     {
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
 
         // Splunk returns: { "entry": [{ "content": { "dispatchState": "...", ... } }] }
         var entry = doc.RootElement
@@ -195,7 +196,7 @@ public sealed class SplunkClient : ISplunkClient
 
     private static SplunkEvent[] ParseResults(string json)
     {
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
 
         // Response format: { "results": [ { "field1": "value1", ... }, ... ] }
         if (!doc.RootElement.TryGetProperty("results", out var results))
@@ -256,7 +257,7 @@ public sealed class SplunkClient : ISplunkClient
     {
         try
         {
-            var doc = JsonDocument.Parse(body);
+            using var doc = JsonDocument.Parse(body);
             if (doc.RootElement.TryGetProperty("messages", out var messages))
             {
                 foreach (var msg in messages.EnumerateArray())
@@ -268,7 +269,7 @@ public sealed class SplunkClient : ISplunkClient
         }
         catch
         {
-            // Not JSON or unexpected format
+            // Best-effort Splunk error extraction: body may be non-JSON or in an unexpected format
         }
         return null;
     }
