@@ -141,18 +141,19 @@ public static class TuiCommand
                         ])
                     ], "Search").FixedHeight(3),
 
+                    // Progress bar (visible during search)
+                    state.IsSearching
+                        ? v.Progress(state.SearchProgress).FixedHeight(1)
+                        : v.Text("").FixedHeight(0),
+
                     // Results area
                     v.Border(b =>
                     [
                         BuildResultsContent(b, state)
                     ], "Results").Fill(),
 
-                    // Status bar
-                    v.HStack(h =>
-                    [
-                        h.Text($" {state.Status}"),
-                        h.Text(" | Ctrl+C: Quit | Enter: Search | ↑↓: Navigate ")
-                    ]).FixedHeight(1)
+                    // Status bar using InfoBar
+                    v.InfoBar(state.Status, "Ctrl+C: Quit | Enter: Search | ↑↓: Navigate").FixedHeight(1)
                 ])
             )
             .WithMouse()
@@ -184,6 +185,7 @@ public static class TuiCommand
         }
 
         state.IsSearching = true;
+        state.SearchProgress = 0;
         state.Status = "Creating search job...";
         state.Events.Clear();
         state.SelectedIndex = 0;
@@ -197,7 +199,11 @@ public static class TuiCommand
             // Wait for job to complete
             var job = await client.WaitForJobAsync(
                 sid,
-                new Progress<SearchJob>(j => state.Status = $"Searching... {j.DoneProgress:P0}"),
+                new Progress<SearchJob>(j =>
+                {
+                    state.SearchProgress = j.DoneProgress * 100;
+                    state.Status = $"Searching... {j.DoneProgress:P0}";
+                }),
                 ct);
 
             if (job.State == SearchJobState.Failed)
@@ -254,6 +260,7 @@ public static class TuiCommand
         public string Query { get; set; } = "";
         public string Status { get; set; } = "";
         public bool IsSearching { get; set; }
+        public double SearchProgress { get; set; }
         public int SelectedIndex { get; set; }
         public List<SplunkEvent> Events { get; } = [];
     }
