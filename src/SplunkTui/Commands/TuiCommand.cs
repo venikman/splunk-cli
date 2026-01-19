@@ -95,7 +95,7 @@ public static class TuiCommand
             var splunkClient = new SplunkClient(httpClient);
 
             // Run the TUI
-            await RunTuiAsync(splunkClient, url, ct);
+            await RunTuiAsync(splunkClient, configService, configPath, url, config, ct);
             return 0;
         }
         catch (OperationCanceledException)
@@ -109,15 +109,26 @@ public static class TuiCommand
         }
     }
 
-    private static async Task RunTuiAsync(ISplunkClient client, string serverUrl, CancellationToken ct)
+    private static async Task RunTuiAsync(
+        ISplunkClient client,
+        IConfigService configService,
+        string? configPath,
+        string serverUrl,
+        AppConfig config,
+        CancellationToken ct)
     {
-        // Application state
+        // Application state with history from config
         var state = new TuiState
         {
             ServerUrl = serverUrl,
-            Query = "index=main",
-            Status = "Ready. Press Enter to search, Ctrl+C to quit."
+            Query = config.History.Count > 0 ? config.History[0] : "index=main",
+            Status = "Ready. Press Enter to search, Ctrl+C to quit.",
+            TimeRange = config.Defaults.TimeRange,
+            ConfigService = configService,
+            ConfigPath = configPath
         };
+        state.History.AddRange(config.History);
+        state.SavedSearches.AddRange(config.SavedSearches);
 
         await using var terminal = Hex1bTerminal.CreateBuilder()
             .WithHex1bApp((app, options) => ctx =>
@@ -146,14 +157,14 @@ public static class TuiCommand
                         ? v.Progress(state.SearchProgress).FixedHeight(1)
                         : v.Text("").FixedHeight(0),
 
-                    // Results area
+                    // Results/Detail area
                     v.Border(b =>
                     [
-                        BuildResultsContent(b, state)
-                    ], "Results").Fill(),
+                        BuildMainContent(b, state)
+                    ], GetMainPanelTitle(state)).Fill(),
 
                     // Status bar using InfoBar
-                    v.InfoBar(state.Status, "Ctrl+C: Quit | Enter: Search | ↑↓: Navigate").FixedHeight(1)
+                    v.InfoBar(state.Status, GetKeyboardHints(state)).FixedHeight(1)
                 ])
             )
             .WithMouse()
@@ -161,6 +172,28 @@ public static class TuiCommand
             .Build();
 
         await terminal.RunAsync(ct);
+    }
+
+    private static string GetMainPanelTitle(TuiState state) => state.Mode switch
+    {
+        TuiMode.EventDetail => "Event Detail (Enter to go back)",
+        _ => "Results"
+    };
+
+    private static string GetKeyboardHints(TuiState state) => state.Mode switch
+    {
+        TuiMode.EventDetail => "Enter: Back | ↑↓: Scroll",
+        _ => "Ctrl+C: Quit | Enter: Search/Detail | ↑↓: Navigate"
+    };
+
+    private static Hex1bWidget BuildMainContent<TParent>(WidgetContext<TParent> ctx, TuiState state)
+        where TParent : Hex1bWidget
+    {
+        return state.Mode switch
+        {
+            TuiMode.EventDetail => BuildEventDetailContent(ctx, state),
+            _ => BuildResultsContent(ctx, state)
+        };
     }
 
     private static Hex1bWidget BuildResultsContent<TParent>(WidgetContext<TParent> ctx, TuiState state)
@@ -173,7 +206,42 @@ public static class TuiCommand
 
         var items = state.Events.Select(FormatEventForList).ToList();
         return ctx.List(items)
-            .OnSelectionChanged(e => state.SelectedIndex = e.SelectedIndex);
+            .OnSelectionChanged(e => state.SelectedIndex = e.SelectedIndex)
+            .OnItemActivated(e =>
+            {
+                state.SelectedIndex = e.ActivatedIndex;
+                state.Mode = TuiMode.EventDetail;
+            });
+    }
+
+    private static Hex1bWidget BuildEventDetailContent<TParent>(WidgetContext<TParent> ctx, TuiState state)
+        where TParent : Hex1bWidget
+    {
+        if (state.SelectedIndex < 0 || state.SelectedIndex >= state.Events.Count)
+        {
+            state.Mode = TuiMode.Results;
+            return ctx.Text("No event selected.");
+        }
+
+        var evt = state.Events[state.SelectedIndex];
+
+        // Build field list with header showing navigation hint
+        var lines = new List<string>
+        {
+            "Press Enter to return to results",
+            new('─', 50)
+        };
+
+        lines.AddRange(evt
+            .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(kv => $"{kv.Key}: {kv.Value ?? "(null)"}"));
+
+        return ctx.List(lines)
+            .OnItemActivated(_ =>
+            {
+                // Pressing Enter in detail view goes back to results
+                state.Mode = TuiMode.Results;
+            });
     }
 
     private static async Task ExecuteSearchAsync(TuiState state, ISplunkClient client, CancellationToken ct)
@@ -189,12 +257,13 @@ public static class TuiCommand
         state.Status = "Creating search job...";
         state.Events.Clear();
         state.SelectedIndex = 0;
+        state.Mode = TuiMode.Results;
 
         string? sid = null;
         try
         {
-            // Create search job with last 24 hours
-            sid = await client.CreateSearchJobAsync(state.Query, "-24h", "now", ct);
+            // Create search job with configured time range
+            sid = await client.CreateSearchJobAsync(state.Query, state.TimeRange, "now", ct);
             state.Status = $"Job created: {sid}. Waiting for results...";
 
             // Wait for job to complete
@@ -220,7 +289,32 @@ public static class TuiCommand
             var events = await client.GetResultsAsync(sid, 0, maxResults, null, ct);
 
             state.Events.AddRange(events);
-            state.Status = $"Found {job.ResultCount:N0} events. Showing first {events.Length}.";
+            state.Status = $"Found {job.ResultCount:N0} events. Showing first {events.Length}. Press Enter on an event for details.";
+
+            // Update local history state immediately (on main thread for thread safety)
+            state.History.Remove(state.Query);
+            state.History.Insert(0, state.Query);
+            if (state.History.Count > 50)
+                state.History.RemoveAt(state.History.Count - 1);
+
+            // Persist to config file in background (fire and forget, don't block UI)
+            if (state.ConfigService != null)
+            {
+                var queryToSave = state.Query; // Capture for closure
+                var configServiceRef = state.ConfigService;
+                var configPathRef = state.ConfigPath;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await configServiceRef.AddHistoryAsync(queryToSave, configPathRef, 50, CancellationToken.None);
+                    }
+                    catch
+                    {
+                        // History save failure is non-critical
+                    }
+                }, CancellationToken.None);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -274,5 +368,23 @@ public static class TuiCommand
         public double SearchProgress { get; set; }
         public int SelectedIndex { get; set; }
         public List<SplunkEvent> Events { get; } = [];
+
+        // Config defaults
+        public string TimeRange { get; set; } = "-24h";
+
+        // History and saved searches (persisted but not displayed in separate UI modes)
+        public List<string> History { get; } = [];
+        public List<SavedSearch> SavedSearches { get; } = [];
+        public IConfigService? ConfigService { get; set; }
+        public string? ConfigPath { get; set; }
+
+        // UI mode
+        public TuiMode Mode { get; set; } = TuiMode.Results;
+    }
+
+    private enum TuiMode
+    {
+        Results,
+        EventDetail
     }
 }
