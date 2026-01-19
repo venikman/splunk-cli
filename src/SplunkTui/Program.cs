@@ -11,6 +11,7 @@ var rootCommand = new RootCommand("Splunk TUI CLI - Export and explore Splunk da
 // Add commands
 rootCommand.AddCommand(ExportCommand.Create());
 rootCommand.AddCommand(TuiCommand.Create());
+rootCommand.AddCommand(ConfigCommand.Create());
 
 // Run
 return await rootCommand.InvokeAsync(args);
