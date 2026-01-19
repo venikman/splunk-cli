@@ -57,13 +57,13 @@ public sealed class CsvFormatter : IEventFormatter
         // Sort fields, but put common Splunk fields first
         var commonFields = new[] { "_time", "_raw", "host", "source", "sourcetype", "index" };
         var orderedFields = commonFields
-            .Where(c => fieldSet.Remove(c))
+            .Where(fieldSet.Remove)
             .ToList();
 
         // Add remaining fields sorted alphabetically
         orderedFields.AddRange(fieldSet.OrderBy(f => f, StringComparer.OrdinalIgnoreCase));
 
-        return orderedFields.ToArray();
+        return [.. orderedFields];
     }
 
     private static async Task WriteHeaderAsync(TextWriter writer, string[] fields)

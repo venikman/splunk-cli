@@ -232,7 +232,7 @@ public sealed class SplunkClient : ISplunkClient
             events.Add(evt);
         }
 
-        return events.ToArray();
+        return [.. events];
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, string operation, CancellationToken ct)

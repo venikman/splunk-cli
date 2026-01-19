@@ -307,7 +307,7 @@ public static class ExportCommand
         };
 
         // Write to stderr so it doesn't interfere with stdout output
-        Console.Error.Write($"\r{message.PadRight(60)}");
+        Console.Error.Write($"\r{message,-60}");
     }
 
     private static string FormatFetchingProgress(ExportProgress p)

@@ -19,7 +19,7 @@ internal static class FormatterUtils
         }
 
         var filtered = new Dictionary<string, string?>(StringComparer.Ordinal);
-        foreach (var field in fields.Where(f => evt.ContainsKey(f)))
+        foreach (var field in fields.Where(evt.ContainsKey))
         {
             filtered[field] = evt[field];
         }
